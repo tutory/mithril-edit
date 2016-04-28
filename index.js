@@ -2,68 +2,64 @@ const m = require('mithril')
 const domHelper = require('./src/dom-helper')
 const transforms = require('./src/transforms')
 
-function snippet (text, start, end, format) {
+function getFragment (text, start, end, formatting) {
   return {
     start: start,
     end: end,
     content: text.substring(start, end),
-    format: format
+    formatting: formatting
   }
 }
 
-function applyFomat (content) {
+function applyFormattings (text, formattings) {
   var result = []
-  var lastPos = content.formats.reduce(function (pos, format) {
+  var lastPos = formattings.reduce(function (pos, formatting) {
     result = result.concat([
-      snippet(content.text, pos, format.start),
-      snippet(content.text, format.start, format.end, format)
+      getFragment(text, pos, formatting.start),
+      getFragment(text, formatting.start, formatting.end, formatting)
     ])
-    return format.end
+    return formatting.end
   }, 0)
-  return result.concat(snippet(content.text, lastPos))
+  return result.concat(getFragment(text, lastPos))
 }
 
-function content (snippet) {
-  if (snippet.format) {
-    return transforms[snippet.format.type].render(snippet.content, snippet.format)
+function getContent (fragment) {
+  if (fragment.formatting) {
+    return transforms[fragment.formatting.type].render(fragment.content, fragment.formatting)
   }
-  return snippet.content
+  return fragment.content
 }
 
 module.exports = {
   controller: function (options) {
     var caretPos
-    var scope = {
-      editorEl: m.prop(),
-      changeIndex: 0,
-      content: options.content
-    }
-
     function addFormatting (type) {
       return function () {
-        scope.changeIndex++
-        scope.content.formats.push({
+        options.content.formattings.push({
           start: scope.selection[0], end: scope.selection[1], type: type
         })
-        scope.content.formats.sort((a, b) => a.start > b.start)
+        options.content.formattings.sort((a, b) => a.start > b.start)
         render()
       }
     }
 
-    scope.makeBold = addFormatting('bold')
-    scope.makeItalic = addFormatting('italic')
+    var scope = {
+      editorEl: m.prop(),
+      makeBold: addFormatting('bold'),
+      makeItalic: addFormatting('italic')
+    }
 
     scope.onChange = function (event) {
       caretPos = domHelper.getCaretCharacterOffsetWithin(event.target)
-      var snippetIndex = Array.from(scope.editorEl().childNodes).indexOf(window.getSelection().focusNode)
+      var fragmentIndex = Array.from(scope.editorEl().childNodes).indexOf(window.getSelection().focusNode)
       var selection = window.getSelection()
-      var offset = scope.out[snippetIndex].start
+      var offset = scope.fragments[fragmentIndex].start
       scope.selection = [offset + selection.anchorOffset, offset + selection.focusOffset]
       console.log(caretPos)
     }
 
     function render () {
-      scope.out = applyFomat(scope.content)
+      scope.fragments = applyFormattings(options.content.text, options.content.formattings)
     }
     render()
 
@@ -74,12 +70,11 @@ module.exports = {
       m('button', { onclick: scope.makeBold }, 'bold'),
       m('button', { onclick: scope.makeItalic }, 'italic'),
       m('[contenteditable]', {
-        key: scope.changeIndex,
         config: scope.editorEl,
         onmouseup: scope.onChange,
         onkeyup: scope.onChange,
         oninput: scope.onChange
-      }, scope.out.map(content))
+      }, scope.fragments.map(getContent))
     ])
   }
 }
