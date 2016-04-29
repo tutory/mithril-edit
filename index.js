@@ -1,5 +1,6 @@
 const m = require('mithril')
 const domHelper = require('./src/dom-helper')
+const stringHelper = require('./src/string-helper')
 const transforms = require('./src/transforms')
 
 function getFragment (text, start, end, formatting) {
@@ -27,12 +28,26 @@ function getContent (fragment) {
   if (fragment.formatting) {
     return transforms[fragment.formatting.type].render(fragment.content, fragment.formatting)
   }
-  return fragment.content
+  return m('span', fragment.content)
+}
+
+var i = 0
+
+function fragmentView (scope) {
+  return function (fragment) {
+    var content = getContent(fragment)
+    content.attrs.config = function (el) {
+      fragment.domEl = el
+      if (fragment.start < scope.caretPos && fragment.end > scope.caretPos) {
+        domHelper.setCaretPos(el, scope.caretPos - fragment.start)
+      }
+    }
+    return content
+  }
 }
 
 module.exports = {
   controller: function (options) {
-    var caretPos
     function addFormatting (type) {
       return function () {
         options.content.formattings.push({
@@ -49,16 +64,32 @@ module.exports = {
       makeItalic: addFormatting('italic')
     }
 
+    scope.onKeyDown = function (event) {
+      scope.caretPos = domHelper.getCaretCharacterOffsetWithin(event.currentTarget)
+    }
+
+    scope.onKeyPress = function (event) {
+      event.preventDefault()
+      var input = String.fromCharCode(event.keyCode)
+      if (input) {
+        options.content.text = stringHelper.insertIntoString(options.content.text, input, scope.caretPos)
+        scope.caretPos++
+      }
+      render()
+    }
+
     scope.onChange = function (event) {
-      caretPos = domHelper.getCaretCharacterOffsetWithin(event.target)
+      scope.caretPos = domHelper.getCaretCharacterOffsetWithin(event.currentTarget)
       var fragmentIndex = Array.from(scope.editorEl().childNodes).indexOf(window.getSelection().focusNode)
-      var selection = window.getSelection()
-      var offset = scope.fragments[fragmentIndex].start
-      scope.selection = [offset + selection.anchorOffset, offset + selection.focusOffset]
-      console.log(caretPos)
+      if (fragmentIndex >= 0) {
+        var selection = window.getSelection()
+        var offset = scope.fragments[fragmentIndex].start
+        scope.selection = [offset + selection.anchorOffset, offset + selection.focusOffset]
+      }
     }
 
     function render () {
+      i++
       scope.fragments = applyFormattings(options.content.text, options.content.formattings)
     }
     render()
@@ -69,12 +100,17 @@ module.exports = {
     return m('.editor', [
       m('button', { onclick: scope.makeBold }, 'bold'),
       m('button', { onclick: scope.makeItalic }, 'italic'),
-      m('[contenteditable]', {
+      m('#editor[contenteditable]', {
+        key: 'editor',
         config: scope.editorEl,
-        onmouseup: scope.onChange,
-        onkeyup: scope.onChange,
-        oninput: scope.onChange
-      }, scope.fragments.map(getContent))
+        onkeypress: scope.onKeyPress,
+        onkeydown: scope.onKeyDown,
+        onmouseup: scope.onChange
+      }, scope.fragments.map(fragmentView(scope))),
+      m('.foo', m('#state', {
+        style: { background: 'silver' },
+        key: i
+      }, scope.fragments.map(getContent)))
     ])
   }
 }

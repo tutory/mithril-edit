@@ -22,4 +22,14 @@ function getCaretCharacterOffsetWithin (element) {
   return caretOffset
 }
 
-module.exports = { getCaretCharacterOffsetWithin}
+function setCaretPos (el, pos) {
+  var range = document.createRange()
+  var sel = window.getSelection()
+  el.focus()
+  range.setStart(el.childNodes[0], pos)
+  range.setEnd(el.childNodes[0], pos)
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
+module.exports = { getCaretCharacterOffsetWithin, setCaretPos}
