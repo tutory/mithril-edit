@@ -1,4 +1,5 @@
-const m = require('mithril')
+const m = require('mithril/render/hyperscript')
+const render = require('mithril/render/render')(window, run).render
 const editor = require('../')
 const domReady = require('domready')
 
@@ -14,18 +15,17 @@ const initialContent = [
   'consetetur sadipscing elitr, sed diam nonumy eirmod tempor'
 ]
 
-domReady(() => {
-  m.mount(document.body, {
-    controller: function () {
-      return {
-        content: initialContent
-      }
-    },
-    view: function (scope) {
-      return [
-        m('h1', 'edit'),
-        m.component(editor, scope)
-      ]
-    }
-  })
-})
+function view () {
+  return [
+    m('h1', 'edit'),
+    m(editor, {
+      content: initialContent
+    })
+  ]
+}
+
+function run () {
+  render(document.body, view())
+}
+
+domReady(run)

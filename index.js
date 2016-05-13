@@ -1,19 +1,17 @@
-const m = require('mithril')
+const m = require('mithril/render/hyperscript')
 const fragmentTypes = require('./src/fragment-types')
 const util = require('./src/util')
 
 module.exports = {
-  controller: function (options) {
-    var stringFragments
-    var scope = {
-      fragments: parse(options.content),
-      makeBold: addFormatting('bold'),
-      makeItalic: addFormatting('italic')
-    }
+  oninit: function (v) {
+    var textFragments
+    v.state.fragments = util.parse(v.attrs.content)
+    v.state.makeBold = addFormatting('bold')
+    v.state.makeItalic = addFormatting('italic')
 
     function render () {
-      stringFragments = []
-      scope.output = renderFragment(scope.fragments)
+      textFragments = []
+      v.state.output = renderFragment(v.state.fragments)
     }
 
     function addFormatting (type) {
@@ -36,58 +34,50 @@ module.exports = {
       }
     }
 
-    function parse (fragment) {
-      if (util.isArray(fragment)) {
-        return { type: 'array', content: fragment.map(parse) }
-      }
-      if (util.isString(fragment)) {
-        return { type: 'string', content: fragment }
-      }
-      if (fragment.content) {
-        fragment.content = parse(fragment.content)
-      }
-      return fragment
-    }
-
     function getSelectedFragement (selection) {
-      const el = selection.focusNode.parentNode
-      return stringFragments.find(fragment => fragment.el === el)
+      const el = selection.focusNode
+      const selectedFragment = textFragments.find(fragment => fragment.el === el)
+      if (!selectedFragment) {
+        throw new Error('no selected fragment found')
+      }
+      return selectedFragment
     }
 
-    scope._show = function (fragment) {
-      return fragmentTypes[fragment.type].render(fragment, scope._show)
+    v.state._show = function (fragment) {
+      return fragmentTypes[fragment.type].render(fragment, v.state._show)
     }
 
     function renderFragment (fragment) {
       var node = fragmentTypes[fragment.type].render(fragment, renderFragment)
-      if (fragment.type === 'string') {
-        stringFragments.push(fragment)
-        node.attrs.config = function (el) {
-          fragment.el = el
+      node.attrs = node.attrs || {}
+      node.attrs.oncreate = node.attrs.onupdate = function (v) {
+        if (node.tag === '#' || node.text) {
+          textFragments.push(fragment)
         }
+        fragment.el = v.dom
       }
       return node
     }
 
     render()
 
-    scope.onInput = function (event) {
+    v.state.onInput = function (event) {
       const selection = document.getSelection()
-      const el = selection.focusNode.parentNode
-      getSelectedFragement(selection).content = el.innerHTML
+      const el = selection.focusNode
+      getSelectedFragement(selection).content = el.textContent
       render()
     }
 
-    return scope
+    return v.state
   },
-  view: function (scope) {
+  view: function (v) {
     return m('.editor', [
-      m('button', { onclick: scope.makeBold }, 'bold'),
-      m('button', { onclick: scope.makeItalic }, 'italic'),
+      m('button', { onclick: v.state.makeBold }, 'bold'),
+      m('button', { onclick: v.state.makeItalic }, 'italic'),
       m('#editor[contenteditable]', {
-        oninput: scope.onInput
-      }, scope.output),
-      m('#viewer', { style: 'background: green', key: 'view' }, scope._show(scope.fragments))
+        oninput: v.state.onInput
+      }, v.state.output),
+      m('#viewer', { style: 'background: green', key: 'view' }, v.state._show(v.state.fragments))
     ])
   }
 }

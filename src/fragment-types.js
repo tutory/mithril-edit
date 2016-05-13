@@ -1,9 +1,9 @@
-const m = require('mithril')
+const m = require('mithril/render/hyperscript')
 
 module.exports = {
   string: {
     render: function (fragment) {
-      return m('span', fragment.content)
+      return { tag: '#', children: fragment.content }
     }
   },
   array: {
@@ -13,12 +13,13 @@ module.exports = {
   },
   bold: {
     render: function (fragment, render) {
-      return m('strong', render(fragment.content))
+      // we have to do this in order to force mithril to create text-nodes
+      return m('strong', ['', render(fragment.content)])
     }
   },
   italic: {
     render: function (fragment, render) {
-      return m('em', render(fragment.content))
+      return m('em', ['', render(fragment.content)])
     }
   },
   image: {

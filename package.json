@@ -12,6 +12,6 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "mithril": "^0.2.4"
+    "mithril": "git://github.com/lhorie/mithril.js.git#rewrite"
   }
 }
