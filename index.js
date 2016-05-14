@@ -8,6 +8,11 @@ module.exports = {
     v.state.fragments = util.parse(v.attrs.content)
     v.state.makeBold = addFormatting('bold')
     v.state.makeItalic = addFormatting('italic')
+    var currentSelection = {
+      fragment: null,
+      start: null,
+      end: null
+    }
 
     function render () {
       textFragments = []
@@ -22,14 +27,18 @@ module.exports = {
         delete fragment.el
         const start = Math.min(selection.anchorOffset, selection.focusOffset)
         const end = Math.max(selection.anchorOffset, selection.focusOffset)
+        const formatedFragment = {
+          type: type,
+          content: { type: 'string', content: fragment.content.substring(start, end) }
+        }
         fragment.content = [
           { type: 'string', content: fragment.content.substring(0, start) },
-          {
-            type: type,
-            content: { type: 'string', content: fragment.content.substring(start, end) }
-          },
+          formatedFragment,
           { type: 'string', content: fragment.content.substring(end) }
         ]
+        currentSelection.fragment = formatedFragment
+        currentSelection.start = 0
+        currentSelection.end = end - start
         render()
       }
     }
@@ -51,6 +60,14 @@ module.exports = {
       var node = fragmentTypes[fragment.type].render(fragment, renderFragment)
       node.attrs = node.attrs || {}
       node.attrs.oncreate = node.attrs.onupdate = function (v) {
+        if (fragment === currentSelection.fragment) {
+          var selection = document.getSelection()
+          var range = document.createRange()
+          range.selectNodeContents(v.dom)
+          selection.removeAllRanges()
+          selection.addRange(range)
+          currentSelection = { fragment: null }
+        }
         if (node.tag === '#' || node.text) {
           textFragments.push(fragment)
         }
